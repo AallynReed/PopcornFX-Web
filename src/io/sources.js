@@ -1,6 +1,15 @@
 // Ways to build a Pack in the browser. Nothing is uploaded: every source reads files
 // lazily, on demand, straight from the user's disk or the given URL.
+//
+// Folders are opened through `<input webkitdirectory>` and drag and drop rather than
+// the File System Access picker, which Chromium refuses for anything under Program
+// Files, where Trove and most games install.
 import { Pack, normalizePath } from './pack.js';
+import { readZip } from '../formats/zip.js';
+
+const PROGRESS_EVERY = 500;
+const isZip = (path) => /\.zip$/i.test(path);
+const plural = (n) => `${n} file${n === 1 ? '' : 's'}`;
 
 const commonFolder = (paths) => {
   const first = paths[0] || '';
@@ -8,39 +17,34 @@ const commonFolder = (paths) => {
   return top && paths.every((p) => p.startsWith(top + '/')) ? top : '';
 };
 
-/**
- * From an `<input type="file">` selection. Folder inputs (`webkitdirectory`) carry
- * each file's path in `webkitRelativePath`; plain multi-file inputs only have names.
- * @param {FileList | File[]} files
- */
-export function packFromFiles(files) {
-  const list = Array.from(files);
-  const entries = list.map((f) => ({ path: f.webkitRelativePath || f.name, size: f.size, blob: async () => f }));
-  const name = commonFolder(entries.map((e) => normalizePath(e.path))) || `${list.length} file${list.length === 1 ? '' : 's'}`;
-  return new Pack(entries, { name });
+// Loose .zip files open as folders named after the archive, so a bundle dropped on its
+// own, or next to other files, reads like the pack it was made from.
+async function expandZips(entries) {
+  const out = [];
+  for (const e of entries) {
+    if (!isZip(e.path)) { out.push(e); continue; }
+    const prefix = normalizePath(e.path).replace(/\.zip$/i, '') + '/';
+    for (const z of readZip(await (await e.blob()).arrayBuffer())) out.push({ ...z, path: prefix + z.path });
+  }
+  return out;
 }
 
-const PROGRESS_EVERY = 500;
+function packName(entries, fallbackCount) {
+  if (entries.length === 1 && isZip(entries[0].path)) return normalizePath(entries[0].path).replace(/\.zip$/i, '');
+  return commonFolder(entries.map((e) => normalizePath(e.path))) || plural(fallbackCount);
+}
 
 /**
- * From a File System Access directory handle (`showDirectoryPicker()`).
- * @param {FileSystemDirectoryHandle} dir
- * @param {{onProgress?: (files: number) => void}} [options]
+ * From an `<input type="file">` selection. Folder inputs (`webkitdirectory`) carry
+ * each file's path in `webkitRelativePath`; plain multi-file inputs only have names,
+ * and any .zip among them is opened.
+ * @param {FileList | File[]} files
  */
-export async function packFromDirectoryHandle(dir, { onProgress } = {}) {
-  const entries = [];
-  const walk = async (handle, prefix) => {
-    for await (const child of handle.values()) {
-      const path = prefix + child.name;
-      if (child.kind === 'directory') await walk(child, path + '/');
-      else {
-        entries.push({ path, blob: () => child.getFile() });
-        if (onProgress && entries.length % PROGRESS_EVERY === 0) onProgress(entries.length);
-      }
-    }
-  };
-  await walk(dir, dir.name + '/');
-  return new Pack(entries, { name: dir.name });
+export async function packFromFiles(files) {
+  const list = Array.from(files);
+  const entries = list.map((f) => ({ path: f.webkitRelativePath || f.name, size: f.size, blob: async () => f }));
+  const folder = list.some((f) => f.webkitRelativePath);
+  return new Pack(folder ? entries : await expandZips(entries), { name: packName(entries, list.length) });
 }
 
 /**
@@ -59,16 +63,17 @@ export function packFromDataTransfer(dataTransfer, { onProgress } = {}) {
     if (entry) roots.push(entry);
     else { const f = item.getAsFile(); if (f) loose.push(f); }
   }
-  if (!roots.length && !loose.length) return Promise.resolve(packFromFiles(dataTransfer.files || []));
+  if (!roots.length && !loose.length) return packFromFiles(dataTransfer.files || []);
 
   return (async () => {
-    const entries = loose.map((f) => ({ path: f.name, size: f.size, blob: async () => f }));
+    const top = loose.map((f) => ({ path: f.name, size: f.size, blob: async () => f }));
+    const nested = [];
     const fileOf = (fe) => new Promise((resolve, reject) => fe.file(resolve, reject));
-    const walk = async (entry, prefix) => {
+    const walk = async (entry, prefix, into) => {
       const path = prefix + entry.name;
       if (entry.isFile) {
-        entries.push({ path, blob: () => fileOf(entry) });
-        if (onProgress && entries.length % PROGRESS_EVERY === 0) onProgress(entries.length);
+        into.push({ path, blob: () => fileOf(entry) });
+        if (onProgress && (top.length + nested.length) % PROGRESS_EVERY === 0) onProgress(top.length + nested.length);
         return;
       }
       const reader = entry.createReader();
@@ -76,22 +81,29 @@ export function packFromDataTransfer(dataTransfer, { onProgress } = {}) {
       for (;;) {
         const batch = await new Promise((resolve, reject) => reader.readEntries(resolve, reject));
         if (!batch.length) break;
-        for (const child of batch) await walk(child, path + '/');
+        for (const child of batch) await walk(child, path + '/', nested);
       }
     };
-    for (const root of roots) await walk(root, '');
-    const name = roots.length === 1 && roots[0].isDirectory ? roots[0].name : `${entries.length} file${entries.length === 1 ? '' : 's'}`;
-    return new Pack(entries, { name });
+    for (const root of roots) await walk(root, '', root.isFile ? top : nested);
+    const name = roots.length === 1 && roots[0].isDirectory ? roots[0].name : packName(top, top.length + nested.length);
+    return new Pack([...await expandZips(top), ...nested], { name });
   })();
 }
 
 /**
- * From a pack published over HTTP: `<base>/index.json` lists `{name, files: [{path, size}]}`
- * and each file is served at `<base>/<path>`. `npm run index-pack` writes that listing.
- * @param {string} base URL of the folder holding index.json
+ * From a URL: a bundle (`….zip`), or a pack folder whose `index.json` lists
+ * `{name, files: [{path, size}]}` with each file served at `<folder>/<path>`.
+ * `npm run bundle` and `npm run index-pack` produce those.
+ * @param {string} url
  */
-export async function packFromUrl(base) {
-  const root = base.endsWith('/') ? base : base + '/';
+export async function packFromUrl(url) {
+  if (isZip(url.split(/[?#]/)[0])) {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`could not download ${url} (HTTP ${res.status})`);
+    const name = decodeURIComponent(url.split(/[?#]/)[0].split('/').pop()).replace(/\.zip$/i, '');
+    return new Pack(readZip(await res.arrayBuffer()), { name });
+  }
+  const root = url.endsWith('/') ? url : url + '/';
   const res = await fetch(root + 'index.json');
   if (!res.ok) throw new Error(`could not read ${root}index.json (HTTP ${res.status})`);
   let index;

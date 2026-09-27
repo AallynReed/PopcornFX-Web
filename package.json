@@ -1,6 +1,6 @@
 {
   "name": "popcornfx-web",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Standalone browser viewer for PopcornFX 1.13.5 particle effects (.pkfx).",
   "license": "MIT",
   "private": true,
@@ -16,7 +16,8 @@
     "lint": "eslint .",
     "check": "npm run lint && npm test && npm run build",
     "corpus": "node scripts/corpus-check.mjs",
-    "index-pack": "node scripts/pack-index.mjs"
+    "index-pack": "node scripts/pack-index.mjs",
+    "bundle": "node scripts/bundle.mjs"
   },
   "keywords": [
     "popcornfx",

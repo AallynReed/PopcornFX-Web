@@ -1,6 +1,7 @@
 import './styles.css';
 import { Viewer } from '../viewer/viewer.js';
-import { packFromFiles, packFromDirectoryHandle, packFromDataTransfer, packFromUrl } from '../io/sources.js';
+import { packFromFiles, packFromDataTransfer, packFromUrl } from '../io/sources.js';
+import { buildBundle, bundleEffect } from '../io/bundle.js';
 import { POPCORNFX_VERSION } from '../version.js';
 import { demoPack } from './demo/demo.js';
 import { EffectList } from './effect-list.js';
@@ -41,7 +42,11 @@ try {
   $('empty').hidden = true;
 }
 
-const inspector = new Inspector($('inspector'));
+const inspector = new Inspector($('inspector'), {
+  onBundle: () => downloadBundle(),
+  onAddFolder: () => openFolder(),
+  onAddFiles: () => openFiles(),
+});
 const list = new EffectList($('effect-list'), {
   onSelect: (path) => openEffect(path),
   onCount: (text) => { $('list-count').textContent = text; },
@@ -64,12 +69,30 @@ function toast(message, kind = 'info', ms = 4200) {
 const hideToast = () => $('toast').classList.remove('show');
 
 // ---- packs ----
-function usePack(next, { preferred = null, fromUrl = false } = {}) {
+const findEffect = (set, path) => {
+  if (!path) return null;
+  const low = path.toLowerCase(), name = low.split('/').pop();
+  return set.effects.find((e) => e.path.toLowerCase() === low || set.relative(e.path).toLowerCase() === low)
+    || set.effects.find((e) => e.name.toLowerCase() === name) || null;
+};
+
+/* A set with effects replaces the open one, keeping the same effect open when it is
+   there too. A set of only assets (textures, atlases, meshes) is added to the open
+   one instead, so missing files can be supplied after the fact. */
+async function usePack(next, { preferred = null, fromUrl = false } = {}) {
   if (!viewer) return;
   if (!next.effects.length) {
-    toast(`No .pkfx effects found in ${next.name}.`, 'warn');
+    if (!pack) { toast(`No .pkfx effects found in ${next.name}.`, 'warn'); return; }
+    const reopen = current;
+    pack = pack.merge(next);
+    viewer.setPack(pack);
+    list.setPack(pack);
+    if (reopen) list.select(reopen);
+    toast(`Added ${formatCount(next.size)} file${next.size === 1 ? '' : 's'}.`);
     return;
   }
+  const keep = current && pack ? pack.relative(current) : null;
+  const want = findEffect(next, preferred) || findEffect(next, await bundleEffect(next)) || findEffect(next, keep) || next.effects[0];
   pack = next;
   shareable = fromUrl;
   viewer.setPack(pack);
@@ -80,45 +103,54 @@ function usePack(next, { preferred = null, fromUrl = false } = {}) {
   $('search').disabled = false;
   $('search').value = '';
   list.setPack(pack);
-  const want = preferred && pack.effects.find((e) => e.path === preferred || pack.relative(e.path).toLowerCase() === preferred.toLowerCase());
-  list.select((want || pack.effects[0]).path);
+  list.select(want.path);
   hideToast();
 }
 
 async function loadWith(label, make, options) {
   toast(`Reading ${label}…`, 'info', 0);
   try {
-    usePack(await make(), options);
+    await usePack(await make(), options);
   } catch (e) {
-    if (e && e.name === 'AbortError') { hideToast(); return; }
     toast(`Could not read ${label}: ${e.message}`, 'error');
   }
 }
 
 const progress = (n) => toast(`Indexing ${formatCount(n)} files…`, 'info', 0);
 
-async function openFolder() {
-  if (window.showDirectoryPicker) {
-    let handle;
-    try { handle = await window.showDirectoryPicker({ id: 'pkfx-pack', mode: 'read' }); } catch { return; }
-    return loadWith(handle.name, () => packFromDirectoryHandle(handle, { onProgress: progress }));
-  }
-  $('folder-input').click();
-}
-
 $('folder-input').addEventListener('change', (e) => {
   const files = e.target.files;
-  if (files.length) loadWith('folder', async () => packFromFiles(files));
+  if (files.length) loadWith('folder', () => packFromFiles(files));
   e.target.value = '';
 });
 $('files-input').addEventListener('change', (e) => {
   const files = e.target.files;
-  if (files.length) loadWith('files', async () => packFromFiles(files));
+  if (files.length) loadWith('files', () => packFromFiles(files));
   e.target.value = '';
 });
+const openFolder = () => $('folder-input').click();
+const openFiles = () => $('files-input').click();
 for (const id of ['open-folder', 'empty-folder']) $(id).addEventListener('click', openFolder);
-for (const id of ['open-files', 'empty-files']) $(id).addEventListener('click', () => $('files-input').click());
+for (const id of ['open-files', 'empty-files']) $(id).addEventListener('click', openFiles);
 $('empty-demo').addEventListener('click', () => usePack(demoPack()));
+
+async function downloadBundle() {
+  if (!pack || !current) return;
+  toast('Bundling…', 'info', 0);
+  try {
+    const { blob, name, missing } = await buildBundle(pack, current);
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    toast(missing.length
+      ? `Saved ${name}. ${missing.length} referenced file${missing.length === 1 ? ' was' : 's were'} missing and not included.`
+      : `Saved ${name}. It opens on its own anywhere, including by dropping it on this page.`, missing.length ? 'warn' : 'info', 6000);
+  } catch (e) {
+    toast(`Could not build the bundle: ${e.message}`, 'error');
+  }
+}
 
 // ---- effects ----
 async function openEffect(path) {
@@ -234,6 +266,7 @@ document.addEventListener('keydown', (e) => {
     g: toggleGround,
     '.': stepFrame,
     s: saveFrame,
+    b: downloadBundle,
   }[key]);
   if (!act) return;
   e.preventDefault();
@@ -256,7 +289,7 @@ window.addEventListener('drop', (e) => {
 });
 
 // console access while developing; stripped from production builds
-if (import.meta.env.DEV) window.pkfx = { viewer, list, inspector, get pack() { return pack; } };
+if (import.meta.env.DEV) window.pkfx = { viewer, list, inspector, usePack, get pack() { return pack; } };
 
 // ---- startup: ?pack=<url>&effect=<path>, or the dev server's local pack ----
 const params = new URLSearchParams(location.search);

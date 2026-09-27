@@ -12,9 +12,13 @@ const RULE_TEXT = {
 const SKIP_TEXT = { distortion: 'distortion is not drawn', 'no texture': 'no texture, so the game draws nothing' };
 
 export class Inspector {
-  /** @param {HTMLElement} el */
-  constructor(el) {
+  /**
+   * @param {HTMLElement} el
+   * @param {{onBundle: () => void, onAddFolder: () => void, onAddFiles: () => void}} actions
+   */
+  constructor(el, actions) {
     this.el = el;
+    this.actions = actions;
     this.counts = [];
     this.diagnosticCount = 0;
     this.report = null;
@@ -74,6 +78,12 @@ export class Inspector {
       report.empty
         ? h('p', { class: 'note' }, 'This file is empty. Mods ship blank effects to switch one off, so nothing plays in game either.')
         : h('p', { class: `badge badge-${badge[0]}` }, badge[1]),
+      h('div', { class: 'panel-actions' },
+        h('button', {
+          class: 'btn btn-sm', type: 'button', html: `${icon('download')}<span>Download bundle</span>`,
+          title: 'Save this effect and every file it uses as one .zip that opens anywhere (B)',
+          onclick: () => this.actions.onBundle(),
+        })),
     );
   }
 
@@ -102,8 +112,17 @@ export class Inspector {
     const summary = [`${report.assets.length - missing} found`];
     if (byName) summary.push(`${byName} by name`);
     if (missing) summary.push(`${missing} missing`);
+    const help = missing ? [
+      h('p', { class: 'note note-tight' }, missing === report.assets.length
+        ? 'None of the files this effect uses were opened with it. Open the whole pack folder, the one holding popcornproject.xml (for Trove, particles/VFX), or add the missing files here.'
+        : 'Some files this effect uses were not opened with it. Add them here, or open the whole pack folder.'),
+      h('div', { class: 'panel-actions' },
+        h('button', { class: 'btn btn-sm', type: 'button', html: `${icon('folder')}<span>Add folder</span>`, onclick: () => this.actions.onAddFolder() }),
+        h('button', { class: 'btn btn-sm', type: 'button', html: `${icon('file')}<span>Add files</span>`, onclick: () => this.actions.onAddFiles() })),
+    ] : null;
     return section('Assets', 'assets',
       h('p', { class: missing ? 'summary summary-warn' : 'summary' }, summary.join(' · ')),
+      help,
       h('ul', { class: 'assets' }, report.assets.map((a) => {
         const state = !a.rule ? 'missing' : a.rule === 'name' ? 'approx' : 'ok';
         return h('li', { class: `asset asset-${state}`, title: a.rule ? `${RULE_TEXT[a.rule]}: ${a.path}` : 'Not found in the opened files' },

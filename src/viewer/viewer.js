@@ -182,16 +182,22 @@ export class Viewer {
       // No Diffuse: the engine falls back to a magenta debug sprite the game never shows
       if (!r.diffuse) { r._skip = 'no texture'; return; }
       const ribbon = r.kind === 'ribbon';
-      [r._tex, r._atlas, r._remap] = await Promise.all([
+      const [tex, atlas, remap] = await Promise.all([
         this._texture(r.diffuse, from, token, warn),
         this._atlas(r.atlas, from, token, warn),
         r.alphaRemap ? this._texture(r.alphaRemap, from, token, warn) : null,
       ]);
+      // a missing remapper means no remapping; white would make every texel opaque
+      r._tex = tex || this.renderer.placeholder;
+      r._atlas = atlas;
+      r._remap = remap;
       r._kind = blendKind(r.material, ribbon);
       // a _Soft material fades where it meets opaque geometry; Trove's ribbon shaders never read depth
       r._soft = !ribbon && /_Soft/i.test(r.material) ? Math.max(r.softness, 1e-3) : 0;
     } else if (r.kind === 'mesh') {
-      [r._geom, r._tex] = await Promise.all([this._mesh(r.mesh, from, token, warn), this._texture(r.diffuse, from, token, warn)]);
+      const [geom, tex] = await Promise.all([this._mesh(r.mesh, from, token, warn), this._texture(r.diffuse, from, token, warn)]);
+      r._geom = geom;
+      r._tex = tex || this.renderer.white;   // untextured meshes draw their colour, as an unbound slot does
       r._lit = !/Additive/i.test(r.material);
       r._kind = /Additive_NoAlpha/i.test(r.material) ? 3 : /Additive/i.test(r.material) ? 1 : 0;
     } else if (r.cls) unsupported.add(r.cls);
@@ -234,9 +240,11 @@ export class Viewer {
     return value;
   }
 
+  // null when the texture is missing or unreadable; callers choose the stand-in
   async _texture(ref, from, token, warn) {
+    if (!ref) return null;
     const gl = this.renderer.gl;
-    const tex = ref && await this._asset('tex', ref, from, token, warn, async (blob) => {
+    return this._asset('tex', ref, from, token, warn, async (blob) => {
       if (/\.dds$/i.test(ref)) {
         const { width, height, rgba } = decodeDDS(await blob.arrayBuffer());
         return makeTexture(gl, width, height, rgba);
@@ -244,7 +252,6 @@ export class Viewer {
       const image = await createImageBitmap(blob, { premultiplyAlpha: 'none', colorSpaceConversion: 'none' });
       try { return makeImageTexture(gl, image); } finally { image.close(); }
     });
-    return tex || this.renderer.white;   // missing textures draw white, like an unbound slot
   }
 
   async _atlas(ref, from, token, warn) {

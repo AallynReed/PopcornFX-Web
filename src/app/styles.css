@@ -394,6 +394,13 @@ kbd {
 .muted { margin: 0; color: var(--text-3); font-size: 13px; }
 .note { margin: 12px 0 0; color: var(--text-2); font-size: 13px; line-height: 1.55; overflow-wrap: anywhere; }
 
+.note-tight { margin: 0 0 10px; }
+.panel-actions { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0 2px; }
+.summary + .note-tight { margin-top: -2px; }
+.panel-actions + .assets { margin-top: 12px; }
+.btn-sm { height: 30px; padding: 0 10px; gap: 6px; font-size: 12.5px; }
+.btn-sm .icon { width: 15px; height: 15px; }
+
 .badge {
   display: inline-flex;
   margin: 12px 0 0;

@@ -19,7 +19,8 @@ Every file names its editor build in its `Version = …;` header, and the inspec
 ## Features
 
 - **Opens whole packs.** Open the folder that holds `popcornproject.xml` and every effect in it is listed, searchable and playable. References resolve the way PopcornFX resolves them, relative to the pack root and case-insensitive.
-- **Opens loose files too.** Drop `.pkfx` files with their textures (for example, a mod) and references fall back to matching by file name.
+- **Opens loose files too.** Drop `.pkfx` files with their textures (for example, a mod) and references fall back to matching by file name. Files added while an effect is open join the open set, so missing textures can be supplied afterwards.
+- **Effect bundles.** Save any effect with everything it uses as one `.zip` that opens on its own, from a drop or a link.
 - **Browses fast.** The effect list is virtualized, shows the editor's thumbnails when the pack has them, and supports `↑`/`↓` to skim effect by effect.
 - **Inspector.** Shows the version header, each layer with live particle counts and renderers, how every referenced asset was found (or that it's missing), and anything the preview doesn't reproduce.
 - **Playback controls.** Play, pause, step, restart, speed from 0.1× to 4×, an optional ground plane, camera reset and PNG export.
@@ -32,9 +33,18 @@ npm ci
 npm run dev
 ```
 
-Open the printed URL, then choose **Open pack folder**, **Open files**, drag files onto the page, or **Try the demo**.
+Open the printed URL, then choose **Open pack folder**, **Open files**, drag files or a bundle onto the page, or **Try the demo**. The same works on the [hosted version](https://aallynreed.github.io/PopcornFX-Web/).
 
-For Trove, extract the game archives with a Trove modding tool and open the `particles/VFX` folder from the extracted files.
+For Trove, extract the game archives with a Trove modding tool and open the `particles/VFX` folder from the extracted files. An effect opened without its pack shows its missing files in the inspector, with buttons to add them.
+
+## Share an effect as a bundle
+
+A bundle is a `.zip` holding one effect, every texture, atlas, mesh, animation and child effect it references, and a small manifest naming the effect. Files are stored at the paths the effect names them by, so a bundle plays the same anywhere.
+
+- **From the viewer:** open the effect and choose **Download bundle** in the inspector, or press `B`.
+- **From the command line:** `npm run bundle -- <pack folder> <effect> [output.zip]`, where `<effect>` is a path inside the pack or just its name, for example `npm run bundle -- path/to/particles/VFX character_mount_dragon_resistor_impact_01`.
+
+Open a bundle by dropping it on the page, choosing it with **Open files**, or linking to it: `https://aallynreed.github.io/PopcornFX-Web/?pack=<url of the .zip>`. The host serving the zip must allow cross-origin requests. Files in a GitHub repository (via `raw.githubusercontent.com`) and on GitHub Pages do; GitHub release downloads do not.
 
 ### Browse a local pack while developing
 
@@ -83,7 +93,7 @@ Not reproduced:
 
 - Decal and sound renderers, and distortion materials (distortion only bends the scene behind it). The inspector lists these per effect.
 - Light renderers, which only light scene geometry and draw nothing themselves.
-- `.fbx` and `.tga` assets, which the browser cannot decode. A missing mesh draws as a cube and a missing texture as white.
+- `.fbx` and `.tga` assets, which the browser cannot decode. A missing mesh draws as a cube and a missing sprite texture as a soft white dot, so the effect's motion and colour still read.
 - Engine inputs a standalone preview doesn't have, such as game-driven attributes (their declared defaults are used) and real scene geometry (a stand-in floor sits 1 unit below the emitter).
 
 ## Development
@@ -97,6 +107,7 @@ Not reproduced:
 | `npm run check` | Lint, test and build, as CI does |
 | `npm run corpus -- <folder>` | Parse, build and simulate every `.pkfx` under a folder and report failures |
 | `npm run index-pack -- <folder>` | Write the `index.json` a hosted pack needs |
+| `npm run bundle -- <folder> <effect> [out.zip]` | Save one effect and its dependencies as a standalone bundle |
 
 Node.js 22.13 or newer is required. Run `npm run corpus` against a real game pack after changing anything in `src/engine/`. On Trove's live pack it currently reports 0 parse, build or simulation failures across 9,382 effects.
 
@@ -104,7 +115,7 @@ Node.js 22.13 or newer is required. Run `npm run corpus` against a real game pac
 
 ### Browser support
 
-Current Chrome, Edge, Firefox and Safari. WebGL 2 is required. Chromium browsers use the File System Access API for **Open pack folder**; others fall back to a folder upload dialog, which still reads files locally.
+Current Chrome, Edge, Firefox and Safari. WebGL 2 is required. **Open pack folder** uses the browser's standard folder dialog rather than the File System Access picker, because Chromium's picker refuses every folder under `Program Files`, where Trove and most games install. The browser may word that dialog as an "upload"; files are still only read locally.
 
 ## License
 

@@ -386,6 +386,8 @@ export class Renderer {
     this.fboW = 0; this.fboH = 0;
 
     this.white = makeTexture(gl, 1, 1, new Uint8ClampedArray([255, 255, 255, 255]));
+    // stands in for a missing sprite texture, so the effect still reads as particles
+    this.placeholder = makeTexture(gl, 64, 64, softDot(64));
     this.cam = { az: 0.6, el: 0.3, dist: 14, target: [0, 1.5, 0] };
     // set by the viewer once it has measured the effect; null = no ground
     this.ground = null;
@@ -448,7 +450,7 @@ export class Renderer {
   }
 
   deleteTexture(tex) {
-    if (tex && tex !== this.white) this.gl.deleteTexture(tex);
+    if (tex && tex !== this.white && tex !== this.placeholder) this.gl.deleteTexture(tex);
   }
 
   resize() {
@@ -659,6 +661,16 @@ function buildCubeMesh() {
     uvs: new Float32Array(uvs),
     indices: new Uint16Array(indices),
   };
+}
+
+// white, alpha falling off quadratically from the centre
+function softDot(size) {
+  const px = new Uint8ClampedArray(size * size * 4).fill(255);
+  for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+    const d = Math.hypot(x + 0.5 - size / 2, y + 0.5 - size / 2) / (size / 2);
+    px[(y * size + x) * 4 + 3] = 255 * Math.max(0, 1 - d) ** 2;
+  }
+  return px;
 }
 
 export function makeTexture(gl, w, h, rgba) {

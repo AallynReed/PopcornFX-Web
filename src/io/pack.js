@@ -50,6 +50,11 @@ export class Pack {
 
   get size() { return this.entries.length; }
 
+  /** This set plus `other`'s files; where both hold a path, this set's copy wins. */
+  merge(other) {
+    return new Pack([...this.entries, ...other.entries], { name: this.name });
+  }
+
   /** Every .pkfx in the set, sorted by file name. */
   get effects() {
     if (!this._effects) {

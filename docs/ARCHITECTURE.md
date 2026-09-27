@@ -21,7 +21,9 @@ PopcornFX-Web turns a `.pkfx` file into moving pixels in five stages. Every stag
 | `src/render/packer.js` | Converts live particles into instance buffers per renderer: billboard corners and UVs, ribbon strips, mesh bases. It also owns draw sorting. |
 | `src/render/renderer.js` | WebGL 2 programs for billboards, ribbons, meshes and the optional ground, plus the blend state for each material kind. |
 | `src/io/pack.js` | The file set an effect reads from, and the lookup rules for references. |
-| `src/io/sources.js` | Builds a pack from a folder picker, file input, drag and drop, or a URL. |
+| `src/io/sources.js` | Builds a pack from a folder or file input, drag and drop, a `.zip`, or a URL. |
+| `src/io/bundle.js` | Collects an effect and its dependencies (following child effects) into a standalone bundle. |
+| `src/formats/zip.js` | ZIP reading and writing on the platform's deflate streams, shared by the app and the CLI. |
 | `src/viewer/viewer.js` | Ties it together: loads an effect and its assets, runs the frame loop, handles camera controls and produces the inspector report. |
 | `src/app/` | The application UI: effect list, inspector, transport controls, demo. |
 | `src/version.js` | The targeted PopcornFX release and version-header comparison. |
@@ -35,6 +37,10 @@ A reference such as `Textures/fx_glow.dds` is resolved against the pack root of 
 3. any file with the same name, reported as `name` (how loose files and mod bundles resolve)
 
 All matching ignores case, like the Windows filesystem the editor and games run on. Trove's own effects depend on this; for example, `VFX_circle_10.dds` ships as `vfx_circle_10.dds`. The inspector shows which rule matched each asset, and `name` matches are flagged because they might pick the wrong file.
+
+A bundle stores each dependency at the path the effect writes, not where it was found, so every reference in a bundle resolves by the `pack` rule. Its `pkfx-bundle.json` names the effect to open first.
+
+A missing sprite texture draws as a soft dot rather than white, so a partial effect still reads; the inspector lists what is missing. A missing alpha remapper means no remapping.
 
 Decoded textures, atlases and meshes are cached by resolved file, so an asset shared by several effects decodes once. When the cache passes 256 entries, assets the current effect doesn't use are released from the GPU.
 

@@ -2,6 +2,19 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.2.0] - 2026-09-27
+
+### Added
+
+- Effect bundles: **Download bundle** (`B`) and `npm run bundle` save an effect with everything it references as one `.zip` that opens anywhere.
+- Opening `.zip` bundles by drop, file picker, or `?pack=<url>.zip`.
+- Files added while an effect is open now join the open set, and the inspector offers **Add folder** and **Add files** when assets are missing.
+
+### Fixed
+
+- **Open pack folder** did nothing in Chrome and Edge for folders under `Program Files`, where Trove installs, because their File System Access picker refuses those folders. It now uses the standard folder dialog.
+- A missing texture drew as a hard white square; sprites now fall back to a soft dot, and a missing alpha remapper no longer makes every texel opaque.
+
 ## [0.1.0] - 2026-09-27
 
 ### Added

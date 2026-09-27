@@ -77,7 +77,7 @@
         <section class="empty" id="empty" aria-labelledby="empty-title">
           <div class="empty-card">
             <h1 id="empty-title">Play PopcornFX effects in your browser</h1>
-            <p>Open a pack folder, the one holding <code>popcornproject.xml</code>, or drop <code>.pkfx</code> files together with the textures they use. Files are read from your disk and never uploaded.</p>
+            <p>Open a pack folder, the one holding <code>popcornproject.xml</code>, or drop an effect bundle (<code>.zip</code>) or <code>.pkfx</code> files together with the textures they use. Files are read from your disk and never uploaded.</p>
             <div class="empty-actions">
               <button class="btn btn-primary" id="empty-folder" type="button"></button>
               <button class="btn" id="empty-files" type="button"></button>
@@ -85,7 +85,7 @@
             </div>
             <details class="empty-more">
               <summary>Where do Trove's effects live?</summary>
-              <p>Trove keeps its effects inside its game archives. Extract them with a Trove modding tool, then open the <code>particles/VFX</code> folder from the extracted files.</p>
+              <p>Trove keeps its effects inside its game archives. Extract them with a Trove modding tool, then open the <code>particles/VFX</code> folder from the extracted files. Your browser may ask whether to "upload" the folder. That is its standard wording for letting a page read files; nothing leaves your computer.</p>
             </details>
           </div>
         </section>
@@ -114,6 +114,7 @@
         <dt><kbd>F</kbd></dt><dd>Reset camera and emitter</dd>
         <dt><kbd>G</kbd></dt><dd>Toggle the ground plane</dd>
         <dt><kbd>S</kbd></dt><dd>Save the frame as PNG</dd>
+        <dt><kbd>B</kbd></dt><dd>Download the effect as a standalone bundle</dd>
         <dt><kbd>I</kbd></dt><dd>Toggle the details panel</dd>
         <dt>Drag</dt><dd>Orbit the camera</dd>
         <dt>Shift-drag</dt><dd>Move the emitter (right-drag works too)</dd>
