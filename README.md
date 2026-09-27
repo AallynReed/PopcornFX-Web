@@ -106,6 +106,10 @@ Node.js 22.13 or newer is required. Run `npm run corpus` against a real game pac
 
 Current Chrome, Edge, Firefox and Safari. WebGL 2 is required. Chromium browsers use the File System Access API for **Open pack folder**; others fall back to a folder upload dialog, which still reads files locally.
 
+## License
+
+[MIT](LICENSE).
+
 ## Trademarks
 
 PopcornFX is a trademark of Persistant Studios, and Trove is a trademark of its owner. This project is not affiliated with or endorsed by either, and it ships none of their content. The demo effect and its textures were made for this project.

@@ -2,6 +2,7 @@
   "name": "popcornfx-web",
   "version": "0.1.0",
   "description": "Standalone browser viewer for PopcornFX 1.13.5 particle effects (.pkfx).",
+  "license": "MIT",
   "private": true,
   "type": "module",
   "engines": {
