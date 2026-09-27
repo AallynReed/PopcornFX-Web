@@ -87,13 +87,14 @@ Then open `…/index.html?pack=<url of the pack folder>`. Add `&effect=Particles
 
 ## What is reproduced
 
-Billboards (screen, viewpos, velocity-axis, spheroidal, capsule and planar modes, atlases, soft animation blending, alpha remapping, soft particles, Trove's `dissolve` user data), ribbons (including `CorrectDeformation`), mesh particles from `.pkmm`, the particle script language, curves and double curves, shape samplers, procedural turbulence (ported from the 1.13 engine, float32 rounding included), animation tracks from `.pkan`, events, trails, localspace, physics with world collisions, attractors, projection, distance limits, spatial layers and flocking.
+Billboards (screen, viewpos, velocity-axis, spheroidal, capsule and planar modes, atlases, soft animation blending, alpha remapping, soft particles, Trove's `dissolve` user data, distortion as Trove draws it), ribbons (including `CorrectDeformation`), mesh particles from `.pkmm`, the particle script language (including spawner scripts and `PostEval`), curves and double curves, shape samplers (including mesh shapes), procedural turbulence (ported from the 1.13 engine, float32 rounding included), animation tracks from `.pkan`, events, trails, localspace, physics with world collisions, attractors, containment, projection, distance limits, spatial layers and flocking.
+
+Effects also break where the game breaks them. A script that names something its layer lacks fails to compile, a value the engine cannot read cuts the file short at that object, and an effect opened from its pack draws nothing for a texture or mesh the pack doesn't have. The inspector says when this happens.
 
 Not reproduced:
 
-- Decal and sound renderers, and distortion materials (distortion only bends the scene behind it). The inspector lists these per effect.
-- Light renderers, which only light scene geometry and draw nothing themselves.
-- `.fbx` and `.tga` assets, which the browser cannot decode. A missing mesh draws as a cube and a missing sprite texture as a soft white dot, so the effect's motion and colour still read.
+- Light and sound renderers. Lights only light scene geometry and draw nothing themselves.
+- `.fbx` and `.tga` assets, which the browser cannot decode. Opened as loose files without their assets, a missing mesh draws as a cube and a missing sprite texture as a soft white dot, so the effect's motion and colour still read.
 - Engine inputs a standalone preview doesn't have, such as game-driven attributes (their declared defaults are used) and real scene geometry (a stand-in floor sits 1 unit below the emitter).
 
 ## Development

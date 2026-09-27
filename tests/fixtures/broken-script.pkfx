@@ -11,6 +11,10 @@ CActionFactoryParticleSpawnerBase	$LOCAL$/Spawner
 }
 CParticleDescriptor	$LOCAL$/Layer
 {
+	CustomFields =
+	{
+		"$LOCAL$/SizeField",
+	};
 	SpawnEvaluator = "$LOCAL$/Spawn";
 	States =
 	{
@@ -30,6 +34,7 @@ CParticleState	$LOCAL$/State
 	Evolvers =
 	{
 		"$LOCAL$/Evolve",
+		"$LOCAL$/Unresolved",
 		"$LOCAL$/Mystery",
 	};
 }
@@ -45,6 +50,22 @@ CCompilerSyntaxNodeExpression	$LOCAL$/EvolveScript
 }
 ";
 }
-CParticleEvolver_Containment	$LOCAL$/Mystery
+CParticleFieldDeclaration	$LOCAL$/SizeField
+{
+	FieldName = "Size";
+}
+CParticleEvolver_Script	$LOCAL$/Unresolved
+{
+	Expression = "$LOCAL$/UnresolvedScript";
+}
+CCompilerSyntaxNodeExpression	$LOCAL$/UnresolvedScript
+{
+	Expression = "function void	Eval()
+{
+	Size = NotDeclared * 2;
+}
+";
+}
+CParticleEvolver_Mystery	$LOCAL$/Mystery
 {
 }

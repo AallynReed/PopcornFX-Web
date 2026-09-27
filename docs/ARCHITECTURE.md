@@ -40,18 +40,23 @@ All matching ignores case, like the Windows filesystem the editor and games run 
 
 A bundle stores each dependency at the path the effect writes, not where it was found, so every reference in a bundle resolves by the `pack` rule. Its `pkfx-bundle.json` names the effect to open first.
 
-A missing sprite texture draws as a soft dot rather than white, so a partial effect still reads; the inspector lists what is missing. A missing alpha remapper means no remapping.
+An effect opened from its pack draws nothing for a texture, alpha remapper or mesh the pack doesn't have, because the game drops such renderers. Loose files use stand-ins instead: a missing sprite texture draws as a soft dot rather than white, so a partial effect still reads, and a missing alpha remapper means no remapping. The inspector lists what is missing either way.
 
 Decoded textures, atlases and meshes are cached by resolved file, so an asset shared by several effects decodes once. When the cache passes 256 entries, assets the current effect doesn't use are released from the GPU.
 
 ## Fidelity
 
-The goal is to match the game, not to look nice. Behaviours were reverse-engineered from the PopcornFX 1.13.5 runtime (`HH-Bridge_r.dll`) and from the particle shaders Trove compiles into its executable. Comments cite the function or shader behind each rule where it isn't obvious. A few consequences that look like bugs but aren't:
+The goal is to match the game, not to look nice. Behaviours were reverse-engineered from the PopcornFX 1.13.5 runtime (`HH-Bridge_r.dll`) and from Trove's own particle renderer and shaders in its executable. Where the two differ, the game wins, since Trove draws particles itself. Comments cite the function or shader behind each rule where it isn't obvious. SSE-heavy billboard kernels are best read in a disassembler: decompilers garble their cross products.
 
-- Vertex colours saturate to 0..1 before drawing, because the engine packs them into RGBA8.
+The editor's `PK-AssetBaker.exe` is a second source of truth. With a `COvenBakeConfig_Particle` config that sets `EnableScriptCache`, it runs the real script compiler over a pack and logs `AST build failed` for every script the engine rejects, and it reports the files its parser gives up on. The port rejects exactly the scripts it rejects.
+
+A few consequences that look like bugs but aren't:
+
+- Vertex colours are not clamped. Trove passes them as float4, so a channel above 1 brightens the texel and only the render target clamps.
 - A billboard without a diffuse texture draws nothing, because the game would show a debug sprite it never ships.
-- Additive materials are unsorted, and alpha-blended ones sort back to front, following the engine's render-list keys.
-- `Additive_NoAlpha` ignores texture alpha entirely.
+- Additive materials are unsorted. Alpha-blended billboards that share a DrawOrder, material and textures are merged into one batch and sorted back to front along the view axis, as Trove's render mediums are. `SortMode` is ignored, as Trove ignores it.
+- `Additive_NoAlpha` ignores texture alpha entirely, and `AlphaBlend_Distortion` adds a faint glow rather than bending the scene, as Trove's distortion shader does without a scene to bend.
+- A script naming a field, attribute or sampler its layer lacks does not run, and a file holding `Infinity` or `-1.#IND` is cut short at that object.
 
 When changing behaviour, cite the source (a decompiled function, a shader, or an editor comparison) next to the change, and run `npm run corpus` against a real pack to catch regressions across thousands of effects.
 

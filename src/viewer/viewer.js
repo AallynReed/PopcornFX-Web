@@ -7,13 +7,13 @@
 import { parsePkfx } from '../engine/parser.js';
 import { buildEffect } from '../engine/model.js';
 import { System, FLOOR_DROP } from '../engine/sim.js';
-import { AnimTrackSampler } from '../engine/curves.js';
+import { AnimTrackSampler, ShapeSampler } from '../engine/curves.js';
 import { decodeDDS } from '../formats/dds.js';
 import { decodePkmm } from '../formats/pkmm.js';
 import { parseAtlas } from '../formats/atlas.js';
 import { extractRefs } from '../formats/refs.js';
-import { Renderer, makeTexture, makeImageTexture } from '../render/renderer.js';
-import { FramePacker, blendKind } from '../render/packer.js';
+import { Renderer, makeLevelsTexture, makeImageTexture } from '../render/renderer.js';
+import { FramePacker, blendKind, mergeMediums } from '../render/packer.js';
 
 const STEP = 1 / 60;
 const MAX_STEP = 0.05;            // longest simulation step; slower frames are split
@@ -102,6 +102,10 @@ export class Viewer {
     const doc = parsePkfx(text);
     report.version = doc.version;
     report.generator = doc.generator;
+    if (doc.aborted) {
+      const { id, value } = doc.aborted;
+      warn(`the engine stops reading this file at ${id.replace('$LOCAL$/', '')} (it cannot read the value ${value}), so everything from there on is missing, as in game`);
+    }
     const effect = buildEffect(doc, Math.random, { warn });
 
     const unsupported = new Set();
@@ -111,6 +115,7 @@ export class Viewer {
       collectUnsupported(layer.evolvers, unsupported);
     }
     jobs.push(this._loadAnimTracks(effect, path));
+    jobs.push(this._loadShapeMeshes(effect, path, token, warn));
     await Promise.all(jobs);
     if (token !== this._token) return null;
 
@@ -175,12 +180,18 @@ export class Viewer {
     if (this._assets.size > CACHE_LIMIT) this._releaseAssets((a) => a.used !== token);
   }
 
+  /* Missing assets: in the game a renderer whose texture, alpha remapper or mesh does not
+     load draws nothing (FUN_1402b3480, FUN_1402b78d0), so an effect opened from its pack
+     (a folder with popcornproject.xml) does the same. Loose files keep stand-ins - a soft
+     dot, a cube - so an effect opened without its assets still reads. */
   async _prepareRenderer(r, from, token, warn, unsupported) {
+    const inPack = this.pack.rootFor(from) != null;
+    const absent = (ref) => inPack && !this.pack.resolve(ref, from);
     if (r.kind === 'billboard' || r.kind === 'ribbon') {
-      // distortion only offsets the scene behind it; it writes no colour of its own
-      if (r.kind === 'billboard' && /Distortion/i.test(r.material)) { r._skip = 'distortion'; return; }
       // No Diffuse: the engine falls back to a magenta debug sprite the game never shows
       if (!r.diffuse) { r._skip = 'no texture'; return; }
+      if (absent(r.diffuse)) { r._skip = 'texture missing from the pack'; return; }
+      if (r.alphaRemap && absent(r.alphaRemap)) { r._skip = 'alpha remapper missing from the pack'; return; }
       const ribbon = r.kind === 'ribbon';
       const [tex, atlas, remap] = await Promise.all([
         this._texture(r.diffuse, from, token, warn),
@@ -195,11 +206,13 @@ export class Viewer {
       // a _Soft material fades where it meets opaque geometry; Trove's ribbon shaders never read depth
       r._soft = !ribbon && /_Soft/i.test(r.material) ? Math.max(r.softness, 1e-3) : 0;
     } else if (r.kind === 'mesh') {
-      const [geom, tex] = await Promise.all([this._mesh(r.mesh, from, token, warn), this._texture(r.diffuse, from, token, warn)]);
+      if (r.mesh && absent(r.mesh)) { r._skip = 'mesh missing from the pack'; return; }
+      const [geom, tex] = await Promise.all([this._mesh(r.mesh, r.subMesh, from, token, warn), this._texture(r.diffuse, from, token, warn)]);
+      if (geom && geom.empty) { r._skip = 'mesh has no geometry'; return; }
       r._geom = geom;
       r._tex = tex || this.renderer.white;   // untextured meshes draw their colour, as an unbound slot does
       r._lit = !/Additive/i.test(r.material);
-      r._kind = /Additive_NoAlpha/i.test(r.material) ? 3 : /Additive/i.test(r.material) ? 1 : 0;
+      r._kind = r._lit ? 0 : 1;
     } else if (r.cls) unsupported.add(r.cls);
   }
 
@@ -217,6 +230,26 @@ export class Viewer {
         if (!ref) continue;
         jobs.push(this.pack.text(ref, from).then((text) => { if (text) s.load(parsePkfx(text)); }).catch(() => {}));
       }
+    }
+    await Promise.all(jobs);
+  }
+
+  // MESH shapes (inside collections too) sample a .pkmm submesh, so they need its data on
+  // the CPU; without it they have no surface to spawn on.
+  async _loadShapeMeshes(effect, from, token, warn) {
+    const shapes = new Set();
+    const visit = (s) => {
+      if (!(s instanceof ShapeSampler) || shapes.has(s)) return;
+      shapes.add(s);
+      for (const sub of s.subs || []) visit(sub);
+    };
+    for (const layer of effect.layers) for (const s of Object.values(layer.samplers)) visit(s);
+    const jobs = [];
+    for (const s of shapes) {
+      const ref = s.meshResourceRef();
+      if (!ref) continue;
+      jobs.push(this._asset('meshdata', ref, from, token, warn, async (blob) => decodePkmm(await blob.arrayBuffer()))
+        .then((m) => { if (m) s.loadMesh(m); }));
     }
     await Promise.all(jobs);
   }
@@ -246,8 +279,7 @@ export class Viewer {
     const gl = this.renderer.gl;
     return this._asset('tex', ref, from, token, warn, async (blob) => {
       if (/\.dds$/i.test(ref)) {
-        const { width, height, rgba } = decodeDDS(await blob.arrayBuffer());
-        return makeTexture(gl, width, height, rgba);
+        return makeLevelsTexture(gl, decodeDDS(await blob.arrayBuffer()).levels);
       }
       const image = await createImageBitmap(blob, { premultiplyAlpha: 'none', colorSpaceConversion: 'none' });
       try { return makeImageTexture(gl, image); } finally { image.close(); }
@@ -260,13 +292,15 @@ export class Viewer {
     return rects && rects.length ? rects : null;
   }
 
-  // .pkmm -> uploaded geometry; null draws the renderer's cube proxy
-  async _mesh(ref, from, token, warn) {
+  // .pkmm -> uploaded geometry, {empty} for a mesh with no submesh; null draws the cube proxy
+  async _mesh(ref, sub, from, token, warn) {
     if (!ref || !/\.pkmm$/i.test(ref)) return null;
-    return this._asset('mesh', ref, from, token, warn, async (blob) => {
+    return this._asset(sub >= 0 ? `mesh${sub}` : 'mesh', ref, from, token, warn, async (blob) => {
       const mesh = decodePkmm(await blob.arrayBuffer());
       if (!mesh) throw new Error('mesh layout not recognized; drawn as a cube');
-      return this.renderer.makeMeshGeometry(mesh);
+      // SubMeshId picks one submesh; one the file lacks leaves nothing to draw
+      const part = sub >= 0 ? mesh.blocks[sub] : mesh;
+      return !part || mesh.empty ? { empty: true } : this.renderer.makeMeshGeometry(part);
     });
   }
 
@@ -277,7 +311,7 @@ export class Viewer {
       slot.promise.then(({ value }) => {
         if (!value) return;
         if (slot.kind === 'tex') this.renderer.deleteTexture(value);
-        else if (slot.kind === 'mesh') this.renderer.deleteMeshGeometry(value);
+        else if (/^mesh\d*$/.test(slot.kind)) this.renderer.deleteMeshGeometry(value);
       });
     }
   }
@@ -313,6 +347,8 @@ export class Viewer {
     const renderer = this.renderer, sys = this.system, fit = this._autofit;
     const measuring = fit.t < MEASURE_SECONDS;
     const eye = renderer.eyePosition();
+    const t = renderer.cam.target, vl = Math.hypot(t[0] - eye[0], t[1] - eye[1], t[2] - eye[2]) || 1;
+    const viewDir = [(t[0] - eye[0]) / vl, (t[1] - eye[1]) / vl, (t[2] - eye[2]) / vl];
     const items = [];
     let alive = 0, maxR2 = 0, minY = Infinity, maxY = -Infinity;
     const layers = [];
@@ -330,7 +366,7 @@ export class Viewer {
         }
         for (const r of ls.L.renderers) {
           if (r._skip) continue;
-          if (r.kind === 'billboard') this.packer.billboards(ls, r, eye, items);
+          if (r.kind === 'billboard') this.packer.billboards(ls, r, eye, viewDir, items);
           else if (r.kind === 'ribbon') this.packer.ribbon(ls, r, eye, items);
           else if (r.kind === 'mesh') this.packer.mesh(ls, r, items);
         }
@@ -360,7 +396,7 @@ export class Viewer {
       renderer.ground = { centre: [e[0], 0, e[2]], y: e[1] - FLOOR_DROP, size: Math.max(fit.scale * 3, 8) };
     } else renderer.ground = null;
 
-    renderer.draw(items);
+    renderer.draw(mergeMediums(items));
   }
 
   // ---- controls: drag orbits, shift/right-drag moves the emitter, wheel/pinch zooms ----

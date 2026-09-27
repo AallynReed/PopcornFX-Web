@@ -19,7 +19,6 @@ test('decodes every value form', () => {
   F = 1000.0f;
   Inf = 1.#INF000e+000;
   NegInf = -1.#INF000e+000;
-  Ind = -1.#IND000e+000;
   B = true;
   Sym = AlphaBlend_Soft;
   V = float3(1.0, -2, 3e-1);
@@ -34,12 +33,29 @@ test('decodes every value form', () => {
   assert.equal(p.F, 1000);
   assert.equal(p.Inf, Infinity);
   assert.equal(p.NegInf, -Infinity);
-  assert.ok(Number.isNaN(p.Ind));
   assert.equal(p.B, true);
   assert.equal(toSym(p.Sym), 'AlphaBlend_Soft');
   assert.deepEqual(toNums(p.V), [1, -2, 0.3]);
   assert.deepEqual(p.L, [1, 2, 3]);
   assert.deepEqual(p.Refs, ['$LOCAL$/B']);
+});
+
+test('a value the engine cannot read cuts the file short there, as the engine does', () => {
+  const doc = parsePkfx(`CX $LOCAL$/A
+{
+  N = 1;
+}
+CX $LOCAL$/B
+{
+  Soft = Infinity;
+}
+CX $LOCAL$/C
+{
+  Ind = -1.#IND000e+000;
+}`);
+  assert.deepEqual(doc.order, ['$LOCAL$/A']);
+  assert.equal(doc.aborted.id, '$LOCAL$/B');
+  assert.equal(parsePkfx('CX $LOCAL$/A { Ind = -1.#IND000e+000; }').aborted.value, '-1.#IND000e+000');
 });
 
 test('keeps multi-line script strings and their escapes', () => {

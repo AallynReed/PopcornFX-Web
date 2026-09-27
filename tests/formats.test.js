@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { decodeDDS } from '../src/formats/dds.js';
+import { decodePkmm } from '../src/formats/pkmm.js';
 import { parseAtlas } from '../src/formats/atlas.js';
 import { POPCORNFX_VERSION, versionSupport } from '../src/version.js';
 
@@ -37,6 +38,20 @@ test('decodes a DXT1 block with punch-through alpha', () => {
   const { rgba } = decodeDDS(dds({ width: 4, height: 4, fourCC: 'DXT1' }, block));
   // black, white, their midpoint (127.5 stored as 128), transparent
   assert.deepEqual([...rgba.slice(0, 16)], [0, 0, 0, 255, 255, 255, 255, 255, 128, 128, 128, 255, 0, 0, 0, 0]);
+});
+
+test('keeps the mip levels the file stores, and only those', () => {
+  const px = (b) => [b, b, b, 0xff];
+  const buf = dds({ width: 2, height: 2 }, [...px(1), ...px(2), ...px(3), ...px(4), ...px(9)]);
+  new DataView(buf).setUint32(28, 2, true);   // dwMipMapCount
+  const { levels } = decodeDDS(buf);
+  assert.deepEqual(levels.map((l) => [l.width, l.height]), [[2, 2], [1, 1]]);
+  assert.equal(levels[1].rgba[0], 9);
+  assert.equal(decodeDDS(dds({ width: 2, height: 1 }, [...px(1), ...px(2)])).levels.length, 1);
+});
+
+test('a mesh file too short for any submesh decodes as empty', () => {
+  assert.deepEqual(decodePkmm(new ArrayBuffer(40)), { empty: true, blocks: [] });
 });
 
 test('rejects files that are not DDS', () => {

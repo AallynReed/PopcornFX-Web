@@ -41,10 +41,15 @@ export function axisAngle(axis, ang) {
   ];
 }
 
-// columns: X = right, Y = up, Z = forward
+// columns: X = right, Y = up, Z = forward. A near-zero axis falls back to the frame's
+// forward (0,0,1) or up (0,1,0) (FUN_18060a2c0 / FUN_18060a3b0); any other is normalized.
 export function basisFromForwardUp(fwd, up) {
-  const f = norm([fwd[0] || 0, fwd[1] || 0, fwd[2] || 1]);
-  let r = cross([up[0] || 0, up[1] || 1, up[2] || 0], f);
+  const unit = (v, d) => {
+    const x = v[0] || 0, y = v[1] || 0, z = v[2] || 0, l2 = x * x + y * y + z * z;
+    return l2 > 1e-13 ? [x / Math.sqrt(l2), y / Math.sqrt(l2), z / Math.sqrt(l2)] : d;
+  };
+  const f = unit(fwd, [0, 0, 1]);
+  let r = cross(unit(up, [0, 1, 0]), f);
   const rl = Math.hypot(r[0], r[1], r[2]);
   r = rl > 1e-5 ? [r[0] / rl, r[1] / rl, r[2] / rl] : [1, 0, 0];
   const u = cross(f, r);

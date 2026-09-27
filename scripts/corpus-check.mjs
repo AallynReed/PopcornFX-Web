@@ -66,7 +66,7 @@ for (const file of files) {
     peakTotal += peak;
   } catch (e) { failures.simulate.push([rel, e.message]); continue; }
   if (fileWarnings.size) withWarnings++;
-  for (const w of fileWarnings) bump(warnings, w.replace(/layer \S+: /, 'layer …: ').replace(/script \S+ failed/, 'script … failed'));
+  for (const w of fileWarnings) bump(warnings, w.replace(/layer \S+: /, 'layer …: ').replace(/script \S+ (failed|does not)/, 'script … $1'));
 }
 
 const seconds = (performance.now() - started) / 1000;

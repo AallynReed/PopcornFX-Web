@@ -124,7 +124,8 @@ class Parser {
       }
       if (this.is('op', '{') && !funcs.size) { funcs.set('Eval', this.parseBlock()); entry = 'Eval'; continue; }
       if (this.is('eof')) break;
-      if (funcs.size) break;   // trailing junk after functions — done
+      // the engine compiles leading junk but not a stray token after the functions
+      if (funcs.size) throw new Error(`script parse: unexpected ${JSON.stringify(this.peek().v)} after the functions`);
       this.next();             // leading junk — skip
     }
     if (!funcs.size) throw new Error('script parse: no function body');
@@ -213,7 +214,13 @@ class Parser {
   parseArgs() {
     this.eat('op', '(');
     const args = [];
-    while (!this.is('op', ')')) { args.push(this.parseExpr()); if (this.is('op', ',')) this.next(); }
+    // a stray ';' inside an argument list compiles in the engine (the baker accepts
+    // `rand(0.5,2.0); ,rand(...)` as two arguments), so skip it
+    while (!this.is('op', ')')) {
+      args.push(this.parseExpr());
+      while (this.is('op', ';')) this.next();
+      if (this.is('op', ',')) this.next();
+    }
     this.eat('op', ')');
     return args;
   }
@@ -244,14 +251,51 @@ function swizzle(v, s) {
 //   spawnerField(name)->array, rand(a,b), vrand(a,b), kill(), triggerEvent(name,args)
 export function compileScript(src) {
   const prog = new Parser(tokenize(src)).parseProgram();
-  const run = (ctx) => {
+  // runFn: one named function (a spawn script's PostEval), after the globals
+  const runFn = (name, ctx) => {
     const st = { funcs: prog.funcs, warned: run._warned };
     const locals = new Map();
     for (const g of prog.globals) execStmt(g, ctx, locals, st);
-    execBlock(prog.funcs.get(prog.entry), ctx, locals, st);
+    execBlock(prog.funcs.get(name), ctx, locals, st);
   };
+  const run = (ctx) => runFn(prog.entry, ctx);
   run._warned = new Set();
-  return { prog, run };
+  return { prog, run, runFn };
+}
+
+const NAMESPACES = new Set(['parent', 'spawner', 'scene', 'effect', 'view', 'fast', 'spatialLayers']);
+
+/** Names a program reads or writes that are not its own locals, constants or namespaces:
+    the fields, attributes, samplers and events it needs from its layer. */
+export function freeNames(prog) {
+  const out = new Set();
+  const expr = (e, L) => {
+    if (!e || typeof e !== 'object') return;
+    if (Array.isArray(e)) { for (const x of e) expr(x, L); return; }
+    switch (e.k) {
+      case 'id': if (!L.has(e.name) && !(e.name in CONSTS)) out.add(e.name); return;
+      case 'member': if (!(e.obj.k === 'id' && NAMESPACES.has(e.obj.name))) expr(e.obj, L); return;
+      case 'method':
+        if (e.obj.k === 'id' && NAMESPACES.has(e.obj.name)) { expr(e.args, L); return; }
+        if (e.obj.k === 'id' && !L.has(e.obj.name)) out.add(e.obj.name); else expr(e.obj, L);
+        expr(e.args, L); return;
+      case 'call': expr(e.args, L); return;
+    }
+    for (const [k, v] of Object.entries(e)) if (k !== 'k' && v && typeof v === 'object') expr(v, L);
+  };
+  const block = (b, outer) => {
+    const L = new Set(outer);
+    for (const s of b.stmts) {
+      if (s.k === 'block') block(s, L);
+      else if (s.k === 'decl') { expr(s.init, L); L.add(s.name); }
+      else if (s.k === 'assign') { expr(s.lhs, L); expr(s.rhs, L); }
+      else if (s.k === 'exprstmt') expr(s.expr, L);
+    }
+  };
+  const globals = new Set();
+  for (const s of prog.globals) if (s.k === 'decl') { expr(s.init, globals); globals.add(s.name); }
+  for (const b of prog.funcs.values()) block(b, globals);
+  return out;
 }
 
 function execBlock(block, ctx, locals, st) {
@@ -407,7 +451,8 @@ function evalCall(e, ctx, locals, st) {
 const clamp1 = (x, a, b) => Math.min(Math.max(x, a), b);
 function sat(v) { return v.map((x) => clamp1(x, 0, 1)); }
 function vlen(v) { let s = 0; for (const x of v) s += x * x; return Math.sqrt(s); }
-function vnorm(v) { const l = vlen(v) || 1; return v.map((x) => x / l); }
+// a zero vector gives NaN, as the engine's rsqrt normalize does (FUN_18023e440)
+function vnorm(v) { const l = vlen(v); return v.map((x) => x / l); }
 function vdot(a, b) { const [x, y, n] = broadcast(a, b); let s = 0; for (let i = 0; i < n; i++) s += x[i] * y[i]; return [s]; }
 function vcross(a, b) {
   const a0 = a[0] ?? 0, a1 = a[1] ?? 0, a2 = a[2] ?? 0;

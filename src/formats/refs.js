@@ -6,6 +6,7 @@ const REF_RE = new RegExp(`"([^"\\n]+\\.(?:${ASSET_EXTENSIONS.join('|')}))"`, 'g
 // object headers sit at column 0: `ClassName<ws>$LOCAL$/id`
 const HEADER_RE = /^(C[A-Za-z0-9_]+)[ \t]+\$LOCAL\$/;
 const ANIM_RE = /\bAnimResource\b/;
+const MESH_RES_RE = /\bMeshResource\b/;
 
 /**
  * Asset paths an effect references, deduplicated case-insensitively in file order.
@@ -13,7 +14,8 @@ const ANIM_RE = /\bAnimResource\b/;
  * Editor-only objects (`CNEdEditor*`: backdrops, preview rooms, scale models) are
  * skipped because they are not render dependencies and do not ship with the game.
  * An `AnimResource` names a mesh, but the motion lives in the sibling `.pkan`, so that
- * path replaces it.
+ * path replaces it. A shape's `MeshResource` may name the `.fbx` a mesh was baked from;
+ * the engine reads the `.pkmm` beside it.
  * @param {string} text
  * @returns {string[]}
  */
@@ -24,11 +26,11 @@ export function extractRefs(text) {
     const header = HEADER_RE.exec(line);
     if (header) { current = header[1]; continue; }
     if (current && current.startsWith('CNEdEditor')) continue;
-    const isAnim = ANIM_RE.test(line);
+    const isAnim = ANIM_RE.test(line), isMeshRes = MESH_RES_RE.test(line);
     for (const m of line.matchAll(REF_RE)) {
       const ref = m[1];
       if (ref.startsWith('$LOCAL$')) continue;
-      const r = isAnim ? ref.replace(/\.[^.\\/]+$/, '.pkan') : ref;
+      const r = isAnim ? ref.replace(/\.[^.\\/]+$/, '.pkan') : isMeshRes ? ref.replace(/\.fbx$/i, '.pkmm') : ref;
       const key = r.toLowerCase();
       if (!seen.has(key)) seen.set(key, r);
     }
