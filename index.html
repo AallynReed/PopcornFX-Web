@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#0c0d11" />
+    <meta name="description" content="Play PopcornFX 1.13.5 particle effects (.pkfx) in the browser. Your files stay on your machine." />
+    <title>PopcornFX-Web</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  </head>
+  <body>
+    <div class="app" id="app">
+      <header class="topbar">
+        <button class="icon-btn only-narrow" id="toggle-sidebar" type="button" aria-label="Show effects" aria-controls="sidebar" aria-expanded="false"></button>
+        <div class="brand">
+          <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 3l3.3 9.7L29 16l-9.7 3.3L16 29l-3.3-9.7L3 16l9.7-3.3z" /></svg>
+          <span class="brand-name">PopcornFX-Web</span>
+          <span class="version-chip" id="version-chip"></span>
+        </div>
+        <div class="topbar-actions">
+          <button class="btn btn-primary" id="open-folder" type="button"></button>
+          <button class="btn" id="open-files" type="button"></button>
+          <button class="icon-btn" id="show-help" type="button" aria-label="Keyboard shortcuts" aria-haspopup="dialog"></button>
+          <button class="icon-btn" id="toggle-inspector" type="button" aria-label="Details panel" aria-controls="inspector" aria-pressed="true"></button>
+        </div>
+        <input type="file" id="folder-input" webkitdirectory multiple hidden />
+        <input type="file" id="files-input" multiple hidden />
+      </header>
+
+      <aside class="sidebar" id="sidebar" aria-label="Effects">
+        <div class="sidebar-head">
+          <div class="pack-name" id="pack-name">No pack open</div>
+          <label class="search">
+            <span class="search-icon" id="search-icon"></span>
+            <input id="search" type="search" placeholder="Filter effects" aria-label="Filter effects" autocomplete="off" spellcheck="false" disabled />
+            <kbd aria-hidden="true">/</kbd>
+          </label>
+          <div class="list-count" id="list-count" aria-live="polite"></div>
+        </div>
+        <div class="effect-list" id="effect-list" role="listbox" tabindex="0" aria-label="Effects"></div>
+      </aside>
+
+      <main class="stage" id="stage">
+        <canvas class="viewport" id="canvas" aria-label="Effect preview. Drag to orbit, shift-drag to move the emitter, scroll to zoom."></canvas>
+
+        <div class="hud">
+          <div class="hud-title">
+            <span class="effect-title" id="effect-title"></span>
+            <span class="effect-status" id="effect-status" aria-live="polite"></span>
+          </div>
+          <div class="hud-stats" id="stats" aria-hidden="true"></div>
+        </div>
+
+        <div class="transport" role="toolbar" aria-label="Playback">
+          <button class="icon-btn" id="restart" type="button" aria-label="Restart (R)" title="Restart (R)"></button>
+          <button class="icon-btn icon-btn-lg" id="play" type="button" aria-label="Pause (Space)" title="Pause (Space)"></button>
+          <button class="icon-btn" id="step" type="button" aria-label="Step one frame (.)" title="Step one frame (.)"></button>
+          <label class="speed" title="Playback speed">
+            <span class="visually-hidden">Playback speed</span>
+            <select id="speed">
+              <option value="0.1">0.1×</option>
+              <option value="0.25">0.25×</option>
+              <option value="0.5">0.5×</option>
+              <option value="1" selected>1×</option>
+              <option value="2">2×</option>
+              <option value="4">4×</option>
+            </select>
+          </label>
+          <span class="divider" aria-hidden="true"></span>
+          <button class="icon-btn" id="ground" type="button" aria-pressed="false" aria-label="Ground plane (G)" title="Ground plane (G)"></button>
+          <button class="icon-btn" id="reset-view" type="button" aria-label="Reset view (F)" title="Reset view (F)"></button>
+          <button class="icon-btn" id="snapshot" type="button" aria-label="Save frame as PNG (S)" title="Save frame as PNG (S)"></button>
+        </div>
+        <p class="hint" aria-hidden="true">Drag to orbit · Shift-drag to move · Scroll to zoom</p>
+
+        <section class="empty" id="empty" aria-labelledby="empty-title">
+          <div class="empty-card">
+            <h1 id="empty-title">Play PopcornFX effects in your browser</h1>
+            <p>Open a pack folder, the one holding <code>popcornproject.xml</code>, or drop <code>.pkfx</code> files together with the textures they use. Files are read from your disk and never uploaded.</p>
+            <div class="empty-actions">
+              <button class="btn btn-primary" id="empty-folder" type="button"></button>
+              <button class="btn" id="empty-files" type="button"></button>
+              <button class="btn btn-ghost" id="empty-demo" type="button"></button>
+            </div>
+            <details class="empty-more">
+              <summary>Where do Trove's effects live?</summary>
+              <p>Trove keeps its effects inside its game archives. Extract them with a Trove modding tool, then open the <code>particles/VFX</code> folder from the extracted files.</p>
+            </details>
+          </div>
+        </section>
+
+        <div class="drop-overlay" id="drop-overlay" hidden>
+          <div class="drop-card">Drop a pack folder or effect files</div>
+        </div>
+        <div class="fatal" id="fatal" hidden></div>
+        <div class="toast" id="toast" role="status" aria-live="polite"></div>
+      </main>
+
+      <aside class="inspector" id="inspector" aria-label="Effect details"></aside>
+    </div>
+
+    <dialog class="help" id="help" aria-labelledby="help-title">
+      <div class="help-head">
+        <h2 id="help-title">Keyboard shortcuts</h2>
+        <button class="icon-btn" id="close-help" type="button" aria-label="Close"></button>
+      </div>
+      <dl class="shortcuts">
+        <dt><kbd>↑</kbd> <kbd>↓</kbd></dt><dd>Previous or next effect</dd>
+        <dt><kbd>/</kbd></dt><dd>Filter effects</dd>
+        <dt><kbd>Space</kbd></dt><dd>Play or pause</dd>
+        <dt><kbd>.</kbd></dt><dd>Step one frame</dd>
+        <dt><kbd>R</kbd></dt><dd>Restart the effect</dd>
+        <dt><kbd>F</kbd></dt><dd>Reset camera and emitter</dd>
+        <dt><kbd>G</kbd></dt><dd>Toggle the ground plane</dd>
+        <dt><kbd>S</kbd></dt><dd>Save the frame as PNG</dd>
+        <dt><kbd>I</kbd></dt><dd>Toggle the details panel</dd>
+        <dt>Drag</dt><dd>Orbit the camera</dd>
+        <dt>Shift-drag</dt><dd>Move the emitter (right-drag works too)</dd>
+        <dt>Scroll</dt><dd>Zoom</dd>
+      </dl>
+    </dialog>
+
+    <script type="module" src="/src/app/main.js"></script>
+  </body>
+</html>

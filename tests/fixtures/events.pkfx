@@ -1,0 +1,77 @@
+Version = 1.13.5.65444;
+Generator = pkfx-web tests;
+CParticleEffect	$LOCAL$/Resource
+{
+	OnSpawn = "$LOCAL$/Spawner";
+}
+CActionFactoryParticleSpawnerBase	$LOCAL$/Spawner
+{
+	Descriptor = "$LOCAL$/Parent";
+	SpawnCount = 5.0000000e+000;
+}
+CParticleDescriptor	$LOCAL$/Parent
+{
+	Renderer = "$LOCAL$/ParentRenderer";
+	SpawnEvaluator = "$LOCAL$/ParentSpawn";
+	CustomEvents =
+	{
+		"$LOCAL$/OnDeathEvent",
+	};
+	States =
+	{
+		"$LOCAL$/ParentState",
+	};
+}
+CCompilerSyntaxNodeExpression	$LOCAL$/ParentSpawn
+{
+	Expression = "function void	Eval()
+{
+	Life = 0.1;
+	Size = 0.2;
+	Velocity = float3(0, 2, 0);
+}
+";
+}
+CParticleState	$LOCAL$/ParentState
+{
+	Evolvers =
+	{
+		"$LOCAL$/ParentPhysics",
+	};
+}
+CParticleEvolver_Physics	$LOCAL$/ParentPhysics
+{
+}
+CParticleEventDeclaration	$LOCAL$/OnDeathEvent
+{
+	EventName = "OnDeath";
+	EventAction = "$LOCAL$/DeathSpawner";
+}
+CActionFactoryParticleSpawnerBase	$LOCAL$/DeathSpawner
+{
+	Descriptor = "$LOCAL$/Child";
+	SpawnCount = 2.0000000e+000;
+}
+CParticleDescriptor	$LOCAL$/Child
+{
+	Renderer = "$LOCAL$/ChildRenderer";
+	SpawnEvaluator = "$LOCAL$/ChildSpawn";
+}
+CCompilerSyntaxNodeExpression	$LOCAL$/ChildSpawn
+{
+	Expression = "function void	Eval()
+{
+	Life = 5.0;
+	Size = parent.Size * 0.5;
+}
+";
+}
+CParticleRenderer_Billboard	$LOCAL$/ParentRenderer
+{
+	Diffuse = "Textures/Parent.dds";
+}
+CParticleRenderer_Billboard	$LOCAL$/ChildRenderer
+{
+	Diffuse = "Textures/child.dds";
+	AtlasDefinition = "AtlasDefinitions/atlasDef_2x2.pkat";
+}

@@ -1,0 +1,50 @@
+Version = 1.13.4.53415;
+CParticleEffect	$LOCAL$/Resource
+{
+	OnSpawn = "$LOCAL$/Spawner";
+}
+CActionFactoryParticleSpawnerBase	$LOCAL$/Spawner
+{
+	Descriptor = "$LOCAL$/Layer";
+	Infinite = true;
+	SpawnCount = 3.0000000e+001;
+}
+CParticleDescriptor	$LOCAL$/Layer
+{
+	SpawnEvaluator = "$LOCAL$/Spawn";
+	States =
+	{
+		"$LOCAL$/State",
+	};
+}
+CCompilerSyntaxNodeExpression	$LOCAL$/Spawn
+{
+	Expression = "function void	Eval()
+{
+	Life = rand(0.5, 1.0;
+}
+";
+}
+CParticleState	$LOCAL$/State
+{
+	Evolvers =
+	{
+		"$LOCAL$/Evolve",
+		"$LOCAL$/Mystery",
+	};
+}
+CParticleEvolver_Script	$LOCAL$/Evolve
+{
+	Expression = "$LOCAL$/EvolveScript";
+}
+CCompilerSyntaxNodeExpression	$LOCAL$/EvolveScript
+{
+	Expression = "function void	Eval()
+{
+	Size = notAFunction(LifeRatio);
+}
+";
+}
+CParticleEvolver_Containment	$LOCAL$/Mystery
+{
+}

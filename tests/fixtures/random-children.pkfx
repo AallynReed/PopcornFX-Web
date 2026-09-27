@@ -1,0 +1,48 @@
+Version = 1.12.0.37283;
+CParticleEffect	$LOCAL$/Resource
+{
+	OnSpawn = "$LOCAL$/Pick";
+}
+CActionFactoryWithRandomChilds	$LOCAL$/Pick
+{
+	ChildList =
+	{
+		"$LOCAL$/Never",
+		"$LOCAL$/Always",
+	};
+}
+CActionFactoryParticleSpawnerBase	$LOCAL$/Never
+{
+	Descriptor = "$LOCAL$/NeverDescriptor";
+	Weight = 0.0000000e+000;
+	SpawnCount = 3.0000000e+000;
+}
+CActionFactoryParticleSpawnerBase	$LOCAL$/Always
+{
+	Descriptor = "$LOCAL$/AlwaysDescriptor";
+	SpawnCount = 3.0000000e+000;
+}
+CParticleDescriptor	$LOCAL$/NeverDescriptor
+{
+	SpawnEvaluator = "$LOCAL$/Spawn";
+}
+CParticleDescriptor	$LOCAL$/AlwaysDescriptor
+{
+	SpawnEvaluator = "$LOCAL$/Spawn";
+}
+CCompilerSyntaxNodeExpression	$LOCAL$/Spawn
+{
+	Expression = "function void	Eval()
+{
+	Life = 1.0;
+}
+";
+}
+CNEdEditorParticle_Data	$LOCAL$/EDITOR
+{
+	Backdrops = "$LOCAL$/_Backdrop";
+}
+CNEdEditorBackdrop_Model	$LOCAL$/_Backdrop
+{
+	MeshPath = "Meshes/editor_only_room.pkmm";
+}

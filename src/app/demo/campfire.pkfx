@@ -1,0 +1,283 @@
+Version = 1.13.5.65444;
+Generator = pkfx-web;
+CParticleEffect	$LOCAL$/Resource
+{
+	OnSpawn = "$LOCAL$/Spawner";
+	CustomAttributes = "$LOCAL$/_GlobalAttributes";
+}
+CParticleAttributeList	$LOCAL$/_GlobalAttributes
+{
+	SamplerList =
+	{
+		"$LOCAL$/Hearth",
+	};
+}
+CParticleSamplerShape	$LOCAL$/Hearth
+{
+	SamplerName = "Hearth";
+	Shape = "$LOCAL$/HearthShape";
+	SampleDimensionality = Volume;
+}
+CShapeDescriptor	$LOCAL$/HearthShape
+{
+	ShapeType = CYLINDER;
+	Radius = 5.0000000e-001;
+	Height = 1.0000000e-001;
+	Position = float3(0.0000000e+000, -9.3000001e-001, 0.0000000e+000);
+}
+CActionFactoryWithChilds	$LOCAL$/Spawner
+{
+	ChildList =
+	{
+		"$LOCAL$/Flames",
+		"$LOCAL$/Sparks",
+	};
+}
+CActionFactoryParticleSpawnerBase	$LOCAL$/Flames
+{
+	Descriptor = "$LOCAL$/FlameDescriptor";
+	Infinite = true;
+	SpawnCount = 9.0000000e+001;
+}
+CParticleDescriptor	$LOCAL$/FlameDescriptor
+{
+	Renderer = "$LOCAL$/FlameRenderer";
+	CustomFields =
+	{
+		"$LOCAL$/FlameColorField",
+		"$LOCAL$/FlameBaseSizeField",
+	};
+	Samplers =
+	{
+		"$LOCAL$/FlameColor",
+		"$LOCAL$/FlameSize",
+		"$LOCAL$/FlameTurbulence",
+	};
+	SpawnEvaluator = "$LOCAL$/FlameSpawn";
+	States =
+	{
+		"$LOCAL$/FlameState",
+	};
+}
+CParticleFieldDeclaration	$LOCAL$/FlameColorField
+{
+	FieldName = "Color";
+	FieldType = float4;
+}
+CParticleFieldDeclaration	$LOCAL$/FlameBaseSizeField
+{
+	FieldName = "BaseSize";
+	FieldType = float;
+}
+CParticleSamplerCurve	$LOCAL$/FlameColor
+{
+	SamplerName = "FlameColor";
+	ValueType = Float4;
+	Interpolator = Linear;
+	Times = { 0.0000000e+000, 1.0000000e-001, 5.5000000e-001, 1.0000000e+000, };
+	FloatValues =
+	{
+		1.0000000e+000, 8.5000000e-001, 4.5000000e-001, 0.0000000e+000,
+		1.0000000e+000, 5.5000000e-001, 1.5000000e-001, 7.5000000e-001,
+		8.5000000e-001, 2.0000000e-001, 4.0000000e-002, 5.0000000e-001,
+		2.0000000e-001, 4.0000000e-002, 2.0000000e-002, 0.0000000e+000,
+	};
+}
+CParticleSamplerCurve	$LOCAL$/FlameSize
+{
+	SamplerName = "FlameSize";
+	ValueType = Float;
+	Interpolator = Linear;
+	Times = { 0.0000000e+000, 2.5000000e-001, 1.0000000e+000, };
+	FloatValues = { 4.0000000e-001, 1.0000000e+000, 2.5000000e-001, };
+}
+CParticleSamplerProceduralTurbulence	$LOCAL$/FlameTurbulence
+{
+	SamplerName = "Turbulence";
+	Strength = 2.5000000e-001;
+	Wavelength = 1.0000000e+000;
+	TimeScale = 4.0000001e-001;
+}
+CCompilerSyntaxNodeExpression	$LOCAL$/FlameSpawn
+{
+	Expression = "function void	Eval()
+{
+	Life = rand(1.4, 2.4);
+	BaseSize = rand(0.14, 0.32);
+	Size = BaseSize;
+	Position = Hearth.samplePosition();
+	Velocity = float3(0, rand(0.8, 1.6), 0);
+	Rotation = rand(-pi, pi);
+}
+";
+}
+CParticleState	$LOCAL$/FlameState
+{
+	Evolvers =
+	{
+		"$LOCAL$/FlamePhysics",
+		"$LOCAL$/FlameRotation",
+		"$LOCAL$/FlameShade",
+	};
+}
+CParticleEvolver_Physics	$LOCAL$/FlamePhysics
+{
+	ConstantAcceleration = float3(0.0000000e+000, 6.0000002e-001, 0.0000000e+000);
+	Drag = 1.5000000e+000;
+	VelocityFieldSampler = "Turbulence";
+}
+CParticleEvolver_Rotation	$LOCAL$/FlameRotation
+{
+}
+CParticleEvolver_Script	$LOCAL$/FlameShade
+{
+	Expression = "$LOCAL$/FlameShadeScript";
+}
+CCompilerSyntaxNodeExpression	$LOCAL$/FlameShadeScript
+{
+	Expression = "function void	Eval()
+{
+	Color = FlameColor.sample(LifeRatio);
+	Size = BaseSize * FlameSize.sample(LifeRatio);
+}
+";
+}
+CParticleRenderer_Billboard	$LOCAL$/FlameRenderer
+{
+	CustomName = "Flames";
+	BillboardingMaterial = Additive;
+	Diffuse = "Textures/demo_glow.png";
+}
+CActionFactoryParticleSpawnerBase	$LOCAL$/Sparks
+{
+	Descriptor = "$LOCAL$/SparkDescriptor";
+	Infinite = true;
+	SpawnCount = 1.4000000e+001;
+}
+CParticleDescriptor	$LOCAL$/SparkDescriptor
+{
+	Renderer = "$LOCAL$/SparkRenderer";
+	CustomFields =
+	{
+		"$LOCAL$/SparkColorField",
+	};
+	SpawnEvaluator = "$LOCAL$/SparkSpawn";
+	States =
+	{
+		"$LOCAL$/SparkState",
+	};
+}
+CParticleFieldDeclaration	$LOCAL$/SparkColorField
+{
+	FieldName = "Color";
+	FieldType = float4;
+}
+CCompilerSyntaxNodeExpression	$LOCAL$/SparkSpawn
+{
+	Expression = "function void	Eval()
+{
+	Life = rand(1.0, 1.8);
+	Size = 0.035;
+	Position = Hearth.samplePosition();
+	Velocity = vrand(0, 1.3) * float3(1, 0, 1) + float3(0, rand(3.5, 5.5), 0);
+	Color = float4(1.0, 0.78, 0.4, 1.0);
+}
+";
+}
+CParticleState	$LOCAL$/SparkState
+{
+	Evolvers =
+	{
+		"$LOCAL$/SparkPhysics",
+		"$LOCAL$/SparkTrail",
+		"$LOCAL$/SparkFade",
+	};
+}
+CParticleEvolver_Physics	$LOCAL$/SparkPhysics
+{
+	ConstantAcceleration = float3(0.0000000e+000, -9.8100004e+000, 0.0000000e+000);
+	Drag = 2.0000000e-001;
+	WorldInteractionMode = OneWay;
+	BounceRestitution = 4.0000001e-001;
+	BouncesBeforeDeath = 2;
+}
+CParticleEvolver_Spawner	$LOCAL$/SparkTrail
+{
+	Descriptor = "$LOCAL$/TrailDescriptor";
+	SpawnMetric = Time;
+	SpawnInterval = 1.4999999e-002;
+}
+CParticleEvolver_Script	$LOCAL$/SparkFade
+{
+	Expression = "$LOCAL$/SparkFadeScript";
+}
+CCompilerSyntaxNodeExpression	$LOCAL$/SparkFadeScript
+{
+	Expression = "function void	Eval()
+{
+	Color.a = 1 - LifeRatio * LifeRatio;
+}
+";
+}
+CParticleRenderer_Billboard	$LOCAL$/SparkRenderer
+{
+	CustomName = "Sparks";
+	BillboardingMaterial = Additive;
+	BillboardMode = VelocityAxisAligned;
+	AxisScale = 3.0000001e-002;
+	Diffuse = "Textures/demo_glow.png";
+}
+CParticleDescriptor	$LOCAL$/TrailDescriptor
+{
+	Renderer = "$LOCAL$/TrailRenderer";
+	CustomFields =
+	{
+		"$LOCAL$/TrailColorField",
+	};
+	SpawnEvaluator = "$LOCAL$/TrailSpawn";
+	States =
+	{
+		"$LOCAL$/TrailState",
+	};
+}
+CParticleFieldDeclaration	$LOCAL$/TrailColorField
+{
+	FieldName = "Color";
+	FieldType = float4;
+}
+CCompilerSyntaxNodeExpression	$LOCAL$/TrailSpawn
+{
+	Expression = "function void	Eval()
+{
+	Life = 0.3;
+	Size = 0.02;
+	Color = float4(1.0, 0.5, 0.18, 0.9);
+}
+";
+}
+CParticleState	$LOCAL$/TrailState
+{
+	Evolvers =
+	{
+		"$LOCAL$/TrailFade",
+	};
+}
+CParticleEvolver_Script	$LOCAL$/TrailFade
+{
+	Expression = "$LOCAL$/TrailFadeScript";
+}
+CCompilerSyntaxNodeExpression	$LOCAL$/TrailFadeScript
+{
+	Expression = "function void	Eval()
+{
+	Size = 0.02 * (1 - LifeRatio);
+	Color.a = 0.9 * (1 - LifeRatio);
+}
+";
+}
+CParticleRenderer_Ribbon	$LOCAL$/TrailRenderer
+{
+	CustomName = "Trails";
+	BillboardingMaterial = Additive;
+	Diffuse = "Textures/demo_streak.png";
+}
