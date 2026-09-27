@@ -29,6 +29,7 @@ A fidelity pass against the PopcornFX 1.13.5 engine and Trove's renderer, checke
 - WithRandomChilds events spawned every alternative; folder random delays were rolled per child.
 - Physics integration for attractor layers and constant-drag layers, collision death timing, localspace for root layers, mesh orientation with zero axis components, and mesh static offsets.
 - An empty mesh file drew an opaque cube inside 14 portal effects.
+- `.pkmm` meshes are read with the engine's own chunk format: 11 meshes that drew as cubes now decode (the jadefin fish among them), and meshes with several submeshes keep all of them instead of the first.
 - A script with a stray `;` inside a call was dropped although the engine compiles it.
 
 ## [0.2.0] - 2026-09-27
